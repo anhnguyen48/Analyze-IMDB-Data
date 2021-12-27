@@ -1,0 +1,174 @@
+#PART ONE
+ 
+#Imports 
+import pandas as pd
+import numpy as np
+import requests
+import json 
+import seaborn as sns; sns.set()
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.naive_bayes import GaussianNB
+from sklearn.pipeline import make_pipeline
+from collections import Counter 
+from sklearn.model_selection import cross_val_score
+pd.set_option('display.max_rows', None)
+pd.set_option('display.max_columns', None)
+#Number One
+#Read in the file 
+
+data = pd.read_csv('ratings.csv')
+ 
+#Sort the averageRating column from highest to lowest values
+dataSort = data.sort_values(by=['averageRating'], ascending=False)
+ 
+#Take the top 1000 records in the dataframe which will have the highest ratings 
+top1000 = dataSort.head(1000)
+ 
+#Print out the “tconst” values for the top 1000 rated movies 
+print("tconst for top 1000 rated movies")
+print(top1000['tconst'])
+
+#Number Two
+#Group member’s APIs
+#Caitlin’s API Key- 8aae97cd
+#Anisha’s API Key - 8540036d
+#Anh’s API Key - acf01704
+#Kriti’s API Key - 4594735b
+#Selin’s API Key -- 534cc2e8
+ 
+#Number Three
+ 
+#Count how many movies/shows come up with an error. Those APIs will not be included for number four.
+errorCount = 0
+ 
+#Different parts needed to put together a real URL
+urlpart1 ='https://www.omdbapi.com/?i=' 
+urlpart2 ='&apikey='
+apiCaitlin = '8aae97cd'
+apiAnh = 'acf01704'
+ 
+#Created empty list to add the different values of a genre for each movie/show
+genreList = []
+ 
+#For loop to go through the top 1000 rated movies/shows from the ratings.csv document
+for i in top1000.tconst.iloc[0:1000]:
+ 
+    #Form the full URL to attach the ttconst with the API code and website
+    actualURL = urlpart1 + i + urlpart2 + '4594735b'
+ 
+    #Pass string containing JSON data into a Python value. Returns data as a Python dictionary
+    files = requests.get(actualURL)
+    files.raise_for_status()
+    space = json.loads(files.text)
+ 
+    #If there is an Error for a key in the dictionary, count it and not include it in the count for the genreList
+    if 'Error' in space.keys():
+        errorCount +=1  
+ 
+    #If no error, 
+    elif 'Error' not in space.keys():
+        #print(space)
+        #print(space.get('Genre'))
+ 
+        #Get Genre of each movie/show and split it by commas if there are more than one genre
+        Genre = space.get('Genre')
+        x = Genre.split(", ")
+ 
+        #For every value in the key Genre, it gets appended to the genreList
+        for i in x:
+            genreList.append(i)
+	
+        #Counts the number of genres with Counter
+        runThrough = Counter(genreList)
+        #print(runThrough)           
+            
+print("API Errors:", errorCount)
+ 
+#Number Four
+ 
+#Graph the genre names on x-axis and counts on the y-axis
+genreNames = list(runThrough.keys())
+#y_pos = np.arange(len(genreNames))
+genreValues = list(runThrough.values())
+ 
+#plt.bar(y_pos, genreValues, align='center', alpha = 0.5)
+plt.bar(genreNames, genreValues, align='center', alpha = 0.5)
+ 
+#plt.xticks(y_pos, genreNames, rotation=90)
+plt.xticks(genreNames, rotation=90)
+ 
+plt.ylabel('Number of Movies')
+plt.title('Number of Movies per Genre')
+plt.savefig('movies.png',dpi=400)
+plt.show()
+
+#PART TWO
+ 
+#Question 1
+ 
+#Upload the csv file to a Pandas Data Frame
+imdb = pd.read_csv("imdb.csv") 
+#Get the first genre in Genre column
+newgenre = imdb["Genre"].str.split(',').str.get(0)
+#Create a new column with newgenre variable and attach it to the data frame
+imdb['New Genre'] = newgenre
+imdb.columns #To check
+ 
+#Question 2
+ 
+x = imdb['Description']
+y = imdb['New Genre']
+#Use multinomial Naive Bayes and TfidfVectorizer to transfrom Description column (x)
+model = make_pipeline(TfidfVectorizer(), MultinomialNB())
+#Use cross-validation to automatically split data into train & test
+#and to average the accuracy store obtained over these splits
+scores = cross_val_score(model, x, y, cv = 10)
+#Calculate the accuracy score obtained over these splits
+print("Accuracy score: " + str(np.round(np.mean(scores), decimals = 4)))
+
+#Part 3
+ 
+#Question 1
+ 
+#Get the second genre in Genre column
+newgenre2 = imdb["Genre"].str.split(',').str.get(1)
+ 
+#Fill in null values with the first genre (New Genre column)
+for i in range(len(imdb)):
+    if pd.isna(newgenre2[i]):
+        newgenre2[i] = newgenre[i]
+#Attach to the data frame
+imdb['New Genre 2'] = newgenre2
+ 
+#Question 2: Produce a pivot table showing avg Revenue given two new genre columns
+ 
+#Including all the null values
+print(imdb.pivot_table('Revenue (Millions)', index = 'New Genre', columns = 'New Genre 2', aggfunc = np.mean))
+
+#Excluding all the null values
+imdb.pivot_table('Revenue (Millions)', index = ['New Genre','New Genre 2'], aggfunc = np.mean)
+ 
+#Question 3
+ 
+#Do a scatter plot of Rating vs Revenue with black color for data points and red for the regression best-fit-line
+sns.regplot('Rating', 'Revenue (Millions)', data = imdb,scatter_kws = {"color": "black"}, line_kws = {"Color": "red"})
+plt.title('Scatter plot of Rating and Revenue')
+plt.show()
+ 
+#Question 4
+ 
+#Create another data frame without null values
+imdb2 = imdb.dropna()
+ 
+y2 = imdb2['New Genre']
+x2 = imdb2[['Revenue (Millions)', 'Runtime (Minutes)', 'Rating']]
+#Use GaussianNB for cross validation
+model2 = GaussianNB()
+scores2 = cross_val_score(model2, x2, y2, cv = 10)
+#Calculate the accuracy score obtained over these splits
+print("Accuracy score: " + str(np.round(np.mean(scores2), decimals = 4)))
+ 
